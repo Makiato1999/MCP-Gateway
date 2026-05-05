@@ -21,7 +21,7 @@
         <repository>
             <id>nexus-aliyun</id>
             <name>nexus-aliyun</name>
-            <url>http://maven.aliyun.com/nexus/content/groups/public/</url>
+            <url>https://maven.aliyun.com/repository/public</url>
             <releases>
                 <enabled>true</enabled>
             </releases>
@@ -33,6 +33,7 @@
 
     <properties>
         <java.version>17</java.version>
+        <spring-ai.version>1.0.0</spring-ai.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
@@ -121,6 +122,14 @@
                 <groupId>io.projectreactor</groupId>
                 <artifactId>reactor-core</artifactId>
                 <version>3.7.3</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
 
             <!-- 扳手工程；设计模式框架 -->
