@@ -44,6 +44,10 @@
             <groupId>com.makiatox.ai</groupId>
             <artifactId>ai-mcp-gateway-case</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
 
     </dependencies>
 

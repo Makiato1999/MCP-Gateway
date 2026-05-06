@@ -25,11 +25,10 @@ public class InitializeHandler implements IRequestHandler {
                         "resources", Map.of()
                 ),
                 "serverInfo", Map.of(
-                        "name", "MCP Weather Proxy Server",
+                        "name", "MCP Word Util Proxy Server",
                         "version", "1.0.0"
                 )
         ), null);
 
     }
-
 }

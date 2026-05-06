@@ -1,4 +1,21 @@
 package com.makiatox.ai.domain.session.service.message.handler.impl;
 
-public class ResourcesListHandler {
+import com.makiatox.ai.domain.session.model.valobj.McpSchemaVO;
+import com.makiatox.ai.domain.session.service.message.handler.IRequestHandler;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+
+import java.util.Map;
+
+@Slf4j
+@Service("resourcesListHandler")
+public class ResourcesListHandler implements IRequestHandler {
+    @Override
+    public McpSchemaVO.JSONRPCResponse handle(McpSchemaVO.JSONRPCRequest message) {
+        return new McpSchemaVO.JSONRPCResponse("2.0", message.id(), Map.of(
+                "resources", Map.of(
+                        "resources", new Object[]{}
+                )
+        ), null);
+    }
 }

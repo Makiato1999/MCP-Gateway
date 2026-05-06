@@ -47,12 +47,12 @@ public class ApiTest {
         ChatClient chatClient = chatClientBuilder.defaultOptions(
                         OpenAiChatOptions.builder()
                                 .model("gpt-4.1-mini-2025-04-14")
-                                .toolCallbacks(new SyncMcpToolCallbackProvider(sseMcpClient01()).getToolCallbacks())
+                                .toolCallbacks(new SyncMcpToolCallbackProvider(sseMcpClient02()).getToolCallbacks())
                                 .build())
                 .build();
 
         // 有哪些工具可以使用
-        log.info("测试结果:{}", chatClient.prompt("有哪些工具可以使用").call().content());
+        log.info("测试结果:{}", chatClient.prompt("把shawn转化为大写").call().content());
     }
 
     public McpSyncClient sseMcpClient02() {

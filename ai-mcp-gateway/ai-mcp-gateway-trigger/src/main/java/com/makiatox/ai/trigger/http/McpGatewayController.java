@@ -1,15 +1,19 @@
 package com.makiatox.ai.trigger.http;
 
 import com.alibaba.fastjson.JSON;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.makiatox.ai.api.IMcpGatewayService;
 import com.makiatox.ai.cases.mcp.IMcpSessionService;
 import com.makiatox.ai.domain.session.model.valobj.McpSchemaVO;
+import com.makiatox.ai.domain.session.model.valobj.SessionConfigVO;
+import com.makiatox.ai.domain.session.service.ISessionManagementService;
 import com.makiatox.ai.domain.session.service.ISessionMessageService;
 import com.makiatox.ai.types.enums.ResponseCode;
 import com.makiatox.ai.types.exception.AppException;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.ServerSentEvent;
@@ -18,7 +22,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
-
 /**
  * MCP 网关服务接口管理
  *
@@ -35,6 +38,12 @@ public class McpGatewayController implements IMcpGatewayService {
     // todo 暂时调用 domain 测试，后续调用 case 编排
     @Resource
     private ISessionMessageService serviceMessageService;
+
+    @Resource
+    private ISessionManagementService sessionManagementService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     public McpGatewayController() {
         System.out.println("xxxx");
@@ -85,6 +94,11 @@ public class McpGatewayController implements IMcpGatewayService {
      *         }
      *     }
      * }
+     *
+     *  接收 MCP 客户端发送的 JSON-RPC 消息，并通过对应会话的 SSE 通道异步回推处理结果。
+     *
+     *  当前方法只负责消息接收、反序列化、分发处理，以及将响应写入 session 对应的 SSE sink。
+     *  HTTP 响应本身不直接承载业务结果，而仅返回接收状态
      */
     @PostMapping(value = "{gatewayId}/mcp/sse", consumes = MediaType.APPLICATION_JSON_VALUE)
     public Mono<ResponseEntity<Object>> handleMessage(@PathVariable("gatewayId") String gatewayId,
@@ -92,21 +106,31 @@ public class McpGatewayController implements IMcpGatewayService {
                                                       @RequestBody String messageBody) {
         try {
             log.info("处理 MCP SSE 消息，gatewayId:{} sessionId:{} messageBody:{}", gatewayId, sessionId, messageBody);
+            SessionConfigVO session = sessionManagementService.getSession(sessionId);
+            if (null == session) {
+                log.warn("会话不存在或已过期，gatewayId:{} sessionId:{}", gatewayId, sessionId);
+                return Mono.just(ResponseEntity.notFound().build());
+            }
+
             McpSchemaVO.JSONRPCMessage jsonrpcMessage = McpSchemaVO.deserializeJsonRpcMessage(messageBody);
             log.info("反序列化消息:{}", jsonrpcMessage.jsonrpc());
 
             // 暂时直接调用 domain，后续调整
-            McpSchemaVO.JSONRPCResponse jsonrpcResponse = serviceMessageService.processHandlerMessage((McpSchemaVO.JSONRPCRequest) jsonrpcMessage);
+            McpSchemaVO.JSONRPCResponse jsonrpcResponse = serviceMessageService.processHandlerMessage(jsonrpcMessage);
+
+            if (null != jsonrpcResponse) {
+                String responseJson = objectMapper.writeValueAsString(jsonrpcResponse);
+                session.getSink().tryEmitNext(ServerSentEvent.<String>builder()
+                        .event("message")
+                        .data(responseJson)
+                        .build());
+            }
 
             log.info("调用结果:{}", JSON.toJSONString(jsonrpcResponse));
-            return Mono.just(
-                    ResponseEntity.ok()
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .body(jsonrpcResponse)
-            );
+            return Mono.just(ResponseEntity.accepted().build());
         } catch (Exception e) {
-            log.info("处理 MCP SSE 消息失败，gatewayId:{} sessionId:{} messageBody:{}", gatewayId, sessionId, messageBody, e);
-            return Mono.empty();
+            log.error("处理 MCP SSE 消息失败，gatewayId:{} sessionId:{} messageBody:{}", gatewayId, sessionId, messageBody, e);
+            return Mono.just(ResponseEntity.internalServerError().build());
         }
 
     }
