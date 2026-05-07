@@ -29,4 +29,8 @@
   - 进入会话/消息处理层识别 `initialize`
   - 调用初始化逻辑生成 `InitializeResult`
   - 最后再统一包装成 `JSONRPCResponse` 返回
+- 消息处理接口开始显式传递 `gatewayId`，为按网关查询配置做准备。
+- 在领域层新增 `ISessionRepository`，由基础设施层实现网关配置聚合查询。
+- `InitializeHandler` 从固定返回调整为基于 `gatewayId` 查询配置后动态组装 `InitializeResult`。
+- `McpSchemaVO` 补充 initialize 相关协议对象，用结构化对象承接 `params` 和 `result`。
 - 当前分支的重点是把 `InitializeHandler` 从硬编码返回，逐步往标准初始化结构靠拢。
