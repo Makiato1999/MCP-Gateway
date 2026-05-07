@@ -43,4 +43,11 @@
         ORDER BY id DESC
     </select>
 
+    <select id="queryMcpGatewayByGatewayId" parameterType="java.lang.String"
+            resultMap="McpGatewayMap">
+        SELECT id, gateway_id, gateway_name, gateway_desc, status
+        FROM mcp_gateway
+        WHERE gateway_id = #{gatewayId}
+    </select>
+
 </mapper>

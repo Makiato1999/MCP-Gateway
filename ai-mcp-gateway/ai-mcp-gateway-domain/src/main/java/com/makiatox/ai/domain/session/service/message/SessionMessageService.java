@@ -31,7 +31,7 @@ public class SessionMessageService implements ISessionMessageService {
     // JSONRPCResponse、JSONRPCRequest、JSONRPCNotification，
     // 所以 processHandlerMessage 方法的入参也要做对应的调整。并在方法内，根据 instanceof 判断类的类型分别进行使用
     @Override
-    public McpSchemaVO.JSONRPCResponse processHandlerMessage(McpSchemaVO.JSONRPCMessage message) {
+    public McpSchemaVO.JSONRPCResponse processHandlerMessage(String gatewayId, McpSchemaVO.JSONRPCMessage message) {
         if (message instanceof McpSchemaVO.JSONRPCResponse response) {
             log.info("收到结果消息");
         }
@@ -53,7 +53,7 @@ public class SessionMessageService implements ISessionMessageService {
             }
 
             // 使用枚举策略模式处理请求
-            return requestHandler.handle(request);
+            return requestHandler.handle(gatewayId, request);
         }
 
         if (message instanceof McpSchemaVO.JSONRPCNotification notification) {
