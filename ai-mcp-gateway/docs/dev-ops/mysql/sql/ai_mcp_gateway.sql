@@ -7,7 +7,7 @@
 #
 # 主机: 127.0.0.1 (MySQL 8.0.42)
 # 数据库: ai_mcp_gateway
-# 生成时间: 2026-01-09 12:05:21 +0000
+# 生成时间: 2026-01-15 00:49:48 +0000
 # ************************************************************
 
 
@@ -140,6 +140,7 @@ CREATE TABLE `mcp_protocol_registry` (
                                          `tool_name` varchar(128) NOT NULL COMMENT 'MCP工具名称（如：JavaSDKMCPClient_getCompanyEmployee）',
                                          `tool_type` varchar(32) NOT NULL DEFAULT 'function' COMMENT '工具类型：function/resource',
                                          `tool_description` varchar(512) DEFAULT NULL COMMENT '工具描述',
+                                         `tool_version` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '1.0.0' COMMENT '工具版本',
                                          `http_url` varchar(512) NOT NULL COMMENT 'HTTP接口地址',
                                          `http_method` varchar(16) NOT NULL DEFAULT 'POST' COMMENT 'HTTP请求方法：GET/POST/PUT/DELETE',
                                          `http_headers` text COMMENT 'HTTP请求头（JSON格式）',
@@ -157,9 +158,9 @@ CREATE TABLE `mcp_protocol_registry` (
 LOCK TABLES `mcp_protocol_registry` WRITE;
 /*!40000 ALTER TABLE `mcp_protocol_registry` DISABLE KEYS */;
 
-INSERT INTO `mcp_protocol_registry` (`id`, `gateway_id`, `tool_id`, `tool_name`, `tool_type`, `tool_description`, `http_url`, `http_method`, `http_headers`, `timeout`, `retry_times`, `status`, `create_time`, `update_time`)
+INSERT INTO `mcp_protocol_registry` (`id`, `gateway_id`, `tool_id`, `tool_name`, `tool_type`, `tool_description`, `tool_version`, `http_url`, `http_method`, `http_headers`, `timeout`, `retry_times`, `status`, `create_time`, `update_time`)
 VALUES
-    (1,'gateway_001',1,'JavaSDKMCPClient_getCompanyEmployee','function','获取公司雇员信息','http://localhost:8701/api/v1/mcp/get_company_employee','POST','{\"Content-Type\": \"application/json\"}',30000,0,1,'2026-01-02 13:10:19','2026-01-02 13:13:50');
+    (1,'gateway_001',1,'JavaSDKMCPClient_getCompanyEmployee','function','获取公司雇员信息','1.0.0','http://localhost:8701/api/v1/mcp/get_company_employee','POST','{\"Content-Type\": \"application/json\"}',30000,0,1,'2026-01-02 13:10:19','2026-01-15 08:48:12');
 
 /*!40000 ALTER TABLE `mcp_protocol_registry` ENABLE KEYS */;
 UNLOCK TABLES;

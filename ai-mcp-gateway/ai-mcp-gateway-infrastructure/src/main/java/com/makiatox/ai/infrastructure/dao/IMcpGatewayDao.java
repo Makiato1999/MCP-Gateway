@@ -19,4 +19,6 @@ public interface IMcpGatewayDao {
 
     List<McpGatewayPO> queryAll();
 
+    McpGatewayPO queryMcpGatewayByGatewayId(String gatewayId);
+
 }
