@@ -34,3 +34,88 @@
 - `InitializeHandler` 从固定返回调整为基于 `gatewayId` 查询配置后动态组装 `InitializeResult`。
 - `McpSchemaVO` 补充 initialize 相关协议对象，用结构化对象承接 `params` 和 `result`。
 - 当前分支的重点是把 `InitializeHandler` 从硬编码返回，逐步往标准初始化结构靠拢。
+
+# 3-8-mcp-message-handler-toollist
+
+- 这一节最重要的结论不是 `tools/list` 本身，而是这条“配置转协议”的链路：
+
+```text
+mcp_protocol_mapping
+-> 扁平字段配置
+-> parentPath / mcpPath 还原树
+-> buildProperty DFS 递归
+-> JsonSchema
+-> Tool
+-> tools/list 响应
+```
+
+- `mcp_protocol_mapping` 不是普通字段清单，而是在关系表里表达一棵字段树，目标是把库里的配置动态还原成 MCP `inputSchema`。
+- 这类设计不依赖 Java，也不是 Java MCP SDK 强制要求的存储方式；SDK 只关心最后返回的 Tool / Schema 结构，表怎么建是项目自己的平台化设计。
+
+- 这张表更准确地说，是“邻接表 + 路径枚举”的混合设计：
+  - 邻接表（adjacency list）：一行表示一个节点，每个节点记录“我是谁”和“我父节点是谁”。
+  - 路径枚举（materialized path）：把从根到当前节点的完整路径直接存下来。
+  - 在本项目里：
+    - `parent_path` 表示当前节点的直接父节点。
+    - `mcp_path` 表示当前节点自己的完整路径。
+    - `field_name` 表示当前节点在当前层的字段名。
+
+- `xxxx.xxx` 这种值就是路径枚举，例如 `xxxRequest01.company.name` 表示：
+  - 根节点是 `xxxRequest01`
+  - 它下面有 `company`
+  - `company` 下面有 `name`
+
+- 以这组数据为例：
+  - `parent_path = null, mcp_path = xxxRequest01`
+  - `parent_path = xxxRequest01, mcp_path = xxxRequest01.company`
+  - `parent_path = xxxRequest01.company, mcp_path = xxxRequest01.company.name`
+- 还原出来的树就是：
+
+```text
+xxxRequest01
+└── company
+    └── name
+```
+
+- 为什么不是存“父 + 子”：
+  - 树里每个节点只有一个父节点，但可能有多个子节点。
+  - 让每一行只记录“我爸是谁”，比在一行里维护不定长子节点集合更自然，也更符合关系表一行一个实体的建模方式。
+
+- 为什么不是直接存一整坨 JSON Schema：
+  - 存 JSON 更适合整体读写。
+  - 存树表更适合配置化管理，例如单独修改字段、控制排序、维护必填、描述、HTTP 映射关系。
+  - 这个项目显然更偏“平台化配置”，所以选择节点级存储而不是整块 Schema 文本。
+
+- `buildProperty` 的算法本质要记住：
+  - `childrenMap` 是邻接表，key 形如 `parent_path -> children`。
+  - `buildProperty(current, childrenMap)` 是多叉树 DFS。
+  - 每次递归返回的是“当前节点对应的 JSON Schema property”。
+  - 从根节点（`parent_path == null`）开始递归，最终拼出整个 `inputSchema`。
+
+- 这一节还有一个容易混的点：要始终区分“外层协议壳子”和“内层 method 数据”。
+  - 外层统一是 `JSONRPCRequest / JSONRPCResponse`。
+  - `initialize` 的内层对象是 `InitializeRequest / InitializeResult`。
+  - `tools/list` 的内层对象是 `ListToolsResult / Tool / JsonSchema`。
+  - 一乱就先回到这句：先分外壳，再看里面装的是什么。
+
+- `tool-list.json` 的定位也要记住：
+  - 它是 `tools/list` 的目标样例 / 验收模板。
+  - 它能帮助对照预期输出长什么样。
+  - 它不是运行时数据源，不能替代 `mcp_protocol_mapping`。
+
+- 这次分支里踩到的两个实际问题值得单独记住：
+  - `Invalid bound statement`：通常先查 MyBatis mapper XML 是否缺少对应 `select`。
+  - `{"tools":[]}`：不一定是构树逻辑错了，也可能是测试数据没有命中 `gatewayId`。
+
+- 一个实用判断标准：
+  - 如果业务目标是“整棵结构整体保存、整体读取”，存 JSON 往往更省事。
+  - 如果业务目标是“节点可管理、可排序、可映射、可单独修改”，树表设计通常更合适。
+
+- 复习时可以直接记住这 7 句话：
+  - `tools/list` 的本质是“数据库配置动态生成 MCP Tool Schema”。
+  - `mcp_protocol_mapping` 存的不是普通字段列表，而是一棵拆平后的字段树。
+  - 这张表是“邻接表 + 路径枚举”的混合设计。
+  - `childrenMap` 是邻接表，`buildProperty` 是多叉树 DFS。
+  - JSON-RPC 是外层壳子，`initialize` / `tools/list` 的对象是内层内容。
+  - `tool-list.json` 是目标样例，不是运行时数据源。
+  - 代码跑不通时，除了逻辑，还要优先检查 mapper 绑定和测试数据是否对齐。

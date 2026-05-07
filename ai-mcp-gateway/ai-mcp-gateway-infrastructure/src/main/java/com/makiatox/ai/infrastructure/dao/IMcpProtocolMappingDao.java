@@ -19,4 +19,6 @@ public interface IMcpProtocolMappingDao {
 
     List<McpProtocolMappingPO> queryAll();
 
+    List<McpProtocolMappingPO> queryMcpGatewayToolConfigList(McpProtocolMappingPO reqPO);
+
 }
