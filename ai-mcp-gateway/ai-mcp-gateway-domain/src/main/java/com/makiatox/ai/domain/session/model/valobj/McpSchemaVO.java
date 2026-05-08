@@ -9,6 +9,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -64,7 +65,16 @@ public class McpSchemaVO {
 
 
     /**
-     * JSON-RPC 2.0 Message Types
+     * JSON-RPC 2.0 外层消息壳子。
+     * <p>
+     * 可以把 MCP 消息先统一理解成两层：
+     * 1. 外层：JSON-RPC 壳子，负责 method / id / params / result 这些通用字段。
+     * 2. 内层：某个具体 method 自己的业务对象，例如 InitializeRequest、ListToolsResult。
+     * <p>
+     * 先进入系统的一定是这一层：
+     * - Request：客户端发请求
+     * - Response：服务端回结果
+     * - Notification：客户端或服务端发通知
      */
     public sealed interface JSONRPCMessage permits JSONRPCRequest, JSONRPCResponse, JSONRPCNotification {
 
@@ -79,6 +89,11 @@ public class McpSchemaVO {
      * @param method  请求方法；initialize、tools/list、tools/call、resources/list
      * @param id      请求ID
      * @param params  请求参数
+     * <p>
+     * 注意：这里的 params 还只是外层壳子里的原始对象。
+     * 真正进入具体 handler 后，才会根据 method 再转换成对应的强类型对象，例如：
+     * - method = initialize -> params 转成 InitializeRequest
+     * - method = tools/list  -> 当前通常无复杂 params，可直接处理
      */
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -104,6 +119,11 @@ public class McpSchemaVO {
      * @param id      请求ID
      * @param result  响应结果
      * @param error   异常结果
+     * <p>
+     * 注意：result 也是一个“外层槽位”，里面装的是什么取决于当前 method。
+     * 常见情况：
+     * - initialize -> result 是 InitializeResult
+     * - tools/list -> result 是 ListToolsResult，或者当前过渡阶段也可能是 Map
      */
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -122,6 +142,12 @@ public class McpSchemaVO {
         }
     }
 
+    /**
+     * method 专属请求对象的标记接口。
+     * <p>
+     * 当前只有 initialize 显式定义了专属请求结构，所以这里只有 InitializeRequest。
+     * 如果后面 tools/call、resources/read 等 method 需要强类型 params，也可以继续往这里扩展。
+     */
     public sealed interface Request
             permits InitializeRequest {
 
@@ -139,6 +165,16 @@ public class McpSchemaVO {
      * - clientInfo：客户端自身信息
      * <p>
      * 可以把它理解成：客户端第一次连上 MCP Server 时，主动报上来的“握手信息”。
+     * <p>
+     * initialize 的层级关系：
+     * <pre>
+     * JSONRPCRequest
+     * `- params
+     *    `- InitializeRequest
+     *       |- protocolVersion
+     *       |- capabilities
+     *       `- clientInfo
+     * </pre>
      */
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -158,6 +194,17 @@ public class McpSchemaVO {
      * - instructions：给客户端的额外说明
      * <p>
      * 可以把它理解成：服务端对 initialize 请求的正式响应内容。
+     * <p>
+     * initialize 响应层级关系：
+     * <pre>
+     * JSONRPCResponse
+     * `- result
+     *    `- InitializeResult
+     *       |- protocolVersion
+     *       |- capabilities
+     *       |- serverInfo
+     *       `- instructions
+     * </pre>
      */
     @JsonInclude(JsonInclude.Include.NON_ABSENT)
     @JsonIgnoreProperties(ignoreUnknown = true)
@@ -383,5 +430,126 @@ public class McpSchemaVO {
      * 5. initialize 这条链路可以简单记为：
      *    JSONRPCRequest -> InitializeRequest -> InitializeResult -> JSONRPCResponse
      */
+
+    /**
+     * `tools/list` 的 result 对象。
+     * <p>
+     * 对应 MCP 返回里的：
+     * <pre>
+     * {
+     *   "tools": [...],
+     *   "nextCursor": "..."
+     * }
+     * </pre>
+     * <p>
+     * tools/list 的响应层级关系：
+     * <pre>
+     * JSONRPCResponse
+     * `- result
+     *    `- ListToolsResult
+     *       |- tools
+     *       |  `- List<Tool>
+     *       `- nextCursor
+     * </pre>
+     * <p>
+     * 当前项目里的 ToolsListHandler 仍处于过渡实现阶段，最外层 result 可能暂时直接返回 Map；
+     * 但结构意图上，推荐理解成这里的 ListToolsResult。
+     */
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record ListToolsResult( // @formatter:off
+                                   @JsonProperty("tools") List<Tool> tools,
+                                   @JsonProperty("nextCursor") String nextCursor) {
+    }// @formatter:on
+
+    /**
+     * 单个 MCP Tool 的定义。
+     * <p>
+     * 对应 `tools/list` 结果里的一个元素：
+     * <pre>
+     * {
+     *   "name": "...",
+     *   "description": "...",
+     *   "inputSchema": { ... }
+     * }
+     * </pre>
+     * <p>
+     * 层级关系：
+     * <pre>
+     * ListToolsResult
+     * `- tools[]
+     *    `- Tool
+     *       |- name
+     *       |- description
+     *       `- inputSchema
+     *          `- JsonSchema
+     * </pre>
+     */
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Tool( // @formatter:off
+                        @JsonProperty("name") String name,
+                        @JsonProperty("description") String description,
+                        @JsonProperty("inputSchema") JsonSchema inputSchema) {
+
+        public Tool(String name, String description, String schema) {
+            this(name, description, parseSchema(schema));
+        }
+
+    } // @formatter:on
+
+
+    /**
+     * Tool 的输入参数 Schema。
+     * <p>
+     * 这部分本质上是在表达 JSON Schema，描述一个 Tool 需要什么输入参数。
+     * 当前项目里，这个结构通常不是手写死的，而是由数据库中的字段配置树递归构造出来。
+     * <p>
+     * 层级关系：
+     * <pre>
+     * Tool
+     * `- inputSchema
+     *    `- JsonSchema
+     *       |- type
+     *       |- properties
+     *       |- required
+     *       |- additionalProperties
+     *       |- $defs
+     *       `- definitions
+     * </pre>
+     * <p>
+     * 其中最关键的是：
+     * - type：当前节点类型，例如 object / string
+     * - properties：子字段定义
+     * - required：必填字段名列表
+     */
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record JsonSchema( // @formatter:off
+                              @JsonProperty("type") String type,
+                              @JsonProperty("properties") Map<String, Object> properties,
+                              @JsonProperty("required") List<String> required,
+                              @JsonProperty("additionalProperties") Boolean additionalProperties,
+                              @JsonProperty("$defs") Map<String, Object> defs,
+                              @JsonProperty("definitions") Map<String, Object> definitions) {
+    } // @formatter:on
+
+    /**
+     * 把字符串形式的 JSON Schema 解析成 JsonSchema 对象。
+     * <p>
+     * 这个辅助方法主要服务于 Tool 的便捷构造函数：
+     * - 外部如果已经拿到一段 schema JSON 字符串
+     * - 可以直接 new Tool(name, description, schemaText)
+     * - 内部再统一转成 JsonSchema
+     */
+    private static JsonSchema parseSchema(String schema) {
+        try {
+            return objectMapper.readValue(schema, JsonSchema.class);
+        }
+        catch (IOException e) {
+            throw new IllegalArgumentException("Invalid schema: " + schema, e);
+        }
+    }
+
 
 }

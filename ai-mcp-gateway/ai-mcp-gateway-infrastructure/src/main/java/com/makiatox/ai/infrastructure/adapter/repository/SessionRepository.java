@@ -2,13 +2,19 @@ package com.makiatox.ai.infrastructure.adapter.repository;
 
 import com.makiatox.ai.domain.session.adapter.repository.ISessionRepository;
 import com.makiatox.ai.domain.session.model.valobj.gateway.McpGatewayConfigVO;
+import com.makiatox.ai.domain.session.model.valobj.gateway.McpGatewayToolConfigVO;
 import com.makiatox.ai.infrastructure.dao.IMcpGatewayDao;
+import com.makiatox.ai.infrastructure.dao.IMcpProtocolMappingDao;
 import com.makiatox.ai.infrastructure.dao.IMcpProtocolRegistryDao;
 import com.makiatox.ai.infrastructure.dao.po.McpGatewayPO;
+import com.makiatox.ai.infrastructure.dao.po.McpProtocolMappingPO;
 import com.makiatox.ai.infrastructure.dao.po.McpProtocolRegistryPO;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Repository;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 会话仓储服务
@@ -22,6 +28,9 @@ public class SessionRepository implements ISessionRepository {
 
     @Resource
     private IMcpProtocolRegistryDao mcpProtocolRegistryDao;
+
+    @Resource
+    private IMcpProtocolMappingDao mcpProtocolMappingDao;
 
     @Override
     public McpGatewayConfigVO queryMcpGatewayConfigByGatewayId(String gatewayId) {
@@ -41,5 +50,33 @@ public class SessionRepository implements ISessionRepository {
                 .toolDesc(mcpProtocolRegistryPO.getToolDescription())
                 .toolVersion(mcpProtocolRegistryPO.getToolVersion())
                 .build();
+    }
+
+    @Override
+    public List<McpGatewayToolConfigVO> queryMcpGatewayToolConfigListByGatewayId(String gatewayId) {
+        McpProtocolMappingPO reqPO = new McpProtocolMappingPO();
+        reqPO.setGatewayId(gatewayId);
+
+        // 1. 查询协议工具映射配置
+        List<McpProtocolMappingPO> poList = mcpProtocolMappingDao.queryMcpGatewayToolConfigList(reqPO);
+
+        // 2. 转换为领域值对象返回
+        List<McpGatewayToolConfigVO> mcpGatewayToolConfigVOS = new ArrayList<>();
+        for (McpProtocolMappingPO po : poList) {
+            mcpGatewayToolConfigVOS.add(McpGatewayToolConfigVO.builder()
+                    .gatewayId(po.getGatewayId())
+                    .toolId(po.getToolId())
+                    .mappingType(po.getMappingType())
+                    .parentPath(po.getParentPath())
+                    .fieldName(po.getFieldName())
+                    .mcpPath(po.getMcpPath())
+                    .mcpType(po.getMcpType())
+                    .mcpDesc(po.getMcpDesc())
+                    .isRequired(po.getIsRequired())
+                    .sortOrder(po.getSortOrder())
+                    .build());
+        }
+
+        return mcpGatewayToolConfigVOS;
     }
 }
