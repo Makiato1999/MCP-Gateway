@@ -41,6 +41,19 @@ public class McpSchemaVO {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * 反序列化外层 JSON-RPC 消息。
+     * <p>
+     * 这个方法处理的是“整段原始 JSON 文本”，目标是先判断这条消息属于：
+     * - Request
+     * - Notification
+     * - Response
+     * <p>
+     * 也就是说，这一步只负责把最外层协议壳子拆出来，
+     * 例如先得到 JSONRPCRequest，再由后续代码根据 method 决定 params 应该转成什么具体对象。
+     * <p>
+     * 可以把它理解成：先拆信封，先知道这是一封什么类型的信。
+     */
     public static JSONRPCMessage deserializeJsonRpcMessage(String jsonText)
             throws IOException {
 
@@ -59,6 +72,20 @@ public class McpSchemaVO {
         throw new IllegalArgumentException("Cannot deserialize JSONRPCMessage: " + jsonText);
     }
 
+    /**
+     * 把外层 JSON-RPC 对象里的某一块数据，再转换成内层强类型对象。
+     * <p>
+     * 常见场景：
+     * - `message.params()` -> `InitializeRequest`
+     * - `message.params()` -> `CallToolRequest`
+     * - `response.result()` -> 某个 method 对应的 result 对象
+     * <p>
+     * 和 deserializeJsonRpcMessage 的区别：
+     * - deserializeJsonRpcMessage：处理整段 JSON 文本，先得到外层壳子
+     * - unmarshalFrom：处理壳子里的 params / result，把它转成 method 专属对象
+     * <p>
+     * 可以把它理解成：信封已经拆开了，现在把里面的内容按目标结构重新整理出来。
+     */
     public static  <T> T unmarshalFrom(Object data, TypeReference<T> typeRef) {
         return objectMapper.convertValue(data, typeRef);
     }
@@ -149,7 +176,7 @@ public class McpSchemaVO {
      * 如果后面 tools/call、resources/read 等 method 需要强类型 params，也可以继续往这里扩展。
      */
     public sealed interface Request
-            permits InitializeRequest {
+            permits CallToolRequest, InitializeRequest {
 
     }
 
@@ -551,5 +578,58 @@ public class McpSchemaVO {
         }
     }
 
+    /**
+     * `tools/call` 的请求参数对象。
+     * <p>
+     * 这一层对应的是 JSON-RPC request 里的 params 部分，例如：
+     * <pre>
+     * {
+     *   "method": "tools/call",
+     *   "params": {
+     *     "name": "getCompanyEmployee",
+     *     "arguments": { ... }
+     *   }
+     * }
+     * </pre>
+     * <p>
+     * 字段含义：
+     * - name：本次要调用哪个 MCP Tool
+     * - arguments：传给这个 Tool 的输入参数
+     * <p>
+     * 这里 `implements Request` 不是为了实现某个方法，而是为了表明：
+     * `CallToolRequest` 也属于“method 专属请求对象”这一类。
+     * <p>
+     * record 自带主构造函数：
+     * - new CallToolRequest(name, argumentsMap)
+     * <p>
+     * 下面额外补的构造函数只是一个便捷入口，允许直接传 JSON 字符串，
+     * 再在内部自动解析成 `Map<String, Object>`，并不是 record 工作所必需的。
+     */
+    @JsonInclude(JsonInclude.Include.NON_ABSENT)
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record CallToolRequest(// @formatter:off
+                                  @JsonProperty("name") String name,
+                                  @JsonProperty("arguments") Map<String, Object> arguments) implements Request {
 
+        /**
+         * 便捷构造函数：
+         * 支持直接传入 JSON 字符串形式的 arguments，
+         * 内部自动解析成 Map，再复用 record 的主构造函数。
+         */
+        public CallToolRequest(String name, String jsonArguments) {
+            this(name, parseJsonArguments(jsonArguments));
+        }
+
+        /**
+         * 把 JSON 字符串解析成 arguments Map。
+         */
+        private static Map<String, Object> parseJsonArguments(String jsonArguments) {
+            try {
+                return objectMapper.readValue(jsonArguments, MAP_TYPE_REF);
+            }
+            catch (IOException e) {
+                throw new IllegalArgumentException("Invalid arguments: " + jsonArguments, e);
+            }
+        }
+    }// @formatter:off
 }

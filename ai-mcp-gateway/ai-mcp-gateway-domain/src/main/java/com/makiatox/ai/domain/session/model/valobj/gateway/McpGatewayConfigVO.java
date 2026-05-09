@@ -6,8 +6,14 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 网关协议配置，值对象
- *
+ * 网关级摘要配置对象。
+ * <p>
+ * 这个对象不关心字段树细节，也不关心具体 HTTP 调用参数，
+ * 它更像“当前 gateway 挂了哪个 tool、这个 tool 叫什么、描述和版本是什么”的概览信息。
+ * <p>
+ * 主要用途：
+ * - `initialize`：组装服务端基础信息
+ * - `tools/list`：补充 tool 的 name / description / version 等摘要信息
  */
 @Getter
 @Builder

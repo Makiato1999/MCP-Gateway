@@ -6,8 +6,16 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 网关协议映射
- *
+ * 工具字段级配置对象。
+ * <p>
+ * 这个对象描述的是某个 tool 的字段树节点信息，
+ * 例如 parentPath、fieldName、mcpPath、字段类型、必填、排序等。
+ * <p>
+ * 主要用途：
+ * - `tools/list`：把数据库中的扁平字段配置恢复成树
+ * - 递归生成 `JsonSchema`
+ * <p>
+ * 可以把它理解成：生成 `inputSchema` 时使用的“字段节点 VO”。
  */
 @Getter
 @Builder
